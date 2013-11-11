@@ -15,15 +15,19 @@ class sample_nltk:
         #Global DS
         self.id_to_word_dict = {}
         self.id_to_bow_dict = {}
+
         self.tokenized_without_stop_words_list = []
         self.stemmed_word_list = []
+
+        self.stop_words_set = set()
     
     def run_main(self):
         self.initialize_logger()
         self.parse_reviews()
-        self.do_tokenize()
+        self.remove_stop_words()
         self.do_stemming()
-    
+        import pdb;pdb.set_trace()   
+ 
     def initialize_logger(self):
         logging.basicConfig(filename=self.logger_file, level=logging.INFO)
         logging.info("Initialized logger")
@@ -41,7 +45,7 @@ class sample_nltk:
     def load_data(self):
         self.load_bow()
         self.load_feat()
-    
+        self.load_stop_words() 
 
     def load_bow(self):
         uniq_id = 0
@@ -63,26 +67,22 @@ class sample_nltk:
             uniq_id += 1            
         logging.info("id_to_bow_dict - length - %s" % (len(self.id_to_bow_dict)))
 
+    def load_stop_words(self):
+        self.stop_words_set = set(nltk.corpus.stopwords.words())
+
     def close_files(self):
         self.bow.close()
         self.feat.close()
 
-    def do_tokenize(self):
-        tokenized_words_list = nltk.word_tokenize("hello ")
-        stop_words_set = set(nltk.corpus.stopwords.words())
-    
-        for word in tokenized_words_list:
-            if word not in stop_words_set:
-                self.tokenized_without_stop_words_list.append(word)
-
-        return self.tokenized_without_stop_words_list
-    
+    def remove_stop_words(self):
+        for uniq_id, word in self.id_to_word_dict.iteritems():
+            if word in self.stop_words_set:
+                self.id_to_word_dict[uniq_id] = '' #Removed stop words will be replaced with null
 
     def do_stemming(self):
         stemmer = nltk.stem.PorterStemmer()
-
-        for word in self.tokenized_without_stop_words_list:
-            self.stemmed_word_list.append(stemmer.stem(word))
+        for uniq_id, word in self.id_to_word_dict.iteritems():
+            self.id_to_word_dict[uniq_id] = stemmer.stem(word)
 
 
 if __name__ == "__main__":
