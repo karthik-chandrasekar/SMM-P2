@@ -1,14 +1,23 @@
 import nltk, os, logging
+import json
+import ConfigParser
 
 class sample_nltk:
     def __init__(self):
 
-        #File names
-        self.bag_of_words_file_dir = "/Users/karthikchandrasekar/Desktop/Studies/Social_Media_Mining/SMM_PROJECT_2/INPUT/aclImdb"
-        self.bag_of_words_file_name = "imdb.vocab"
+        self.config = ConfigParser.ConfigParser()
+        self.config.read("senti_analysis.config")
 
-        self.feat_file_dir = "/Users/karthikchandrasekar/Desktop/Studies/Social_Media_Mining/SMM_PROJECT_2/INPUT/aclImdb/train"
-        self.feat_file_name = "labeledBow.feat"
+
+        #File names
+        self.bag_of_words_file_dir = self.config.get('GLOBAL','bag_of_words_file_dir')
+        self.bag_of_words_file_name = self.config.get('GLOBAL', 'bag_of_words_file_name')
+        self.feat_file_dir = self.config.get('GLOBAL', 'feat_file_dir')
+        self.feat_file_name = self.config.get('GLOBAL', 'feat_file_name')
+
+        self.preprocessing_results_dir = self.config.get('PRE_PROCESSING', 'pre_processing_results_dir')
+        self.preprocessing_results_file_name = self.config.get('PRE_PROCESSING', 'pre_processing_results_file_name')
+        self.preprocessing_results_file = os.path.join(self.preprocessing_results_dir, self.preprocessing_results_file_name)
 
         self.logger_file = os.path.join("OUTPUT", "senti_analysis.log")
 
@@ -22,11 +31,15 @@ class sample_nltk:
         self.stop_words_set = set()
     
     def run_main(self):
+        self.preprocessing()
+
+
+    def preprocessing(self):
         self.initialize_logger()
         self.parse_reviews()
         self.remove_stop_words()
         self.do_stemming()
-        import pdb;pdb.set_trace()   
+        self.dump_preprocessing()
  
     def initialize_logger(self):
         logging.basicConfig(filename=self.logger_file, level=logging.INFO)
@@ -84,6 +97,10 @@ class sample_nltk:
         for uniq_id, word in self.id_to_word_dict.iteritems():
             self.id_to_word_dict[uniq_id] = stemmer.stem(word)
 
+    def dump_preprocessing(self):
+        fd = open(self.preprocessing_results_file, 'w')
+        fd.write(json.dumps(self.id_to_word_dict))
+        fd.close()
 
 if __name__ == "__main__":
     sn = sample_nltk()
