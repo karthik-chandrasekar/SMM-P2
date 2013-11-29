@@ -29,8 +29,7 @@ class sample_nltk:
 
         self.tokenized_without_stop_words_list = []
         self.stemmed_word_list = []
-        self.reviews_list = []
-    
+ 
         self.stop_words_set = set()
     
     def run_main(self):
@@ -44,22 +43,27 @@ class sample_nltk:
         self.parse_reviews()
         self.remove_stop_words()
         self.do_stemming()
-        self.dump_preprocessing()
+        #self.dump_preprocessing()
 
     def feature_selection(self):
 
-        self.pos_reviews, self.neg_reviews = self.get_labelled_reviews_words(self.reviews_list)
-        self.test_pos_reviews, self.test_neg_feats = self.get_labelled_reviews_words(self.feat_reviews_list)
-        
-        self.pos_tagged_words, self.neg_tagged_words = self.tag_words_with_labels(self.pos_reviews, self.neg_reviews) 
-        self.test_pos_tagged_words, self.test_neg_tagged_words = self.tag_words_with_labels(self.test_pos_reviews, self.test_neg_feats)    
 
-        self.train_feats = self.pos_tagged_reviews + self.neg_tagged_reviews
-        self.test_feats = self.test_post_tagged_words + self.test_neg_tagged_words  
+        self.pos_reviews, self.neg_reviews = self.get_labelled_reviews_words(self.train_reviews_list)
+        self.test_pos_reviews, self.test_neg_reviews = self.get_labelled_reviews_words(self.test_reviews_list)
+      
+
+        self.pos_tagged_reviews, self.neg_tagged_reviews = self.tag_words_with_labels(self.pos_reviews, self.neg_reviews) 
+        self.test_pos_tagged_reviews, self.test_neg_tagged_reviews = self.tag_words_with_labels(self.test_pos_reviews, self.test_neg_reviews)    
+        self.train_reviews = self.pos_tagged_reviews + self.neg_tagged_reviews
+        self.test_reviews = self.test_pos_tagged_reviews + self.test_neg_tagged_reviews  
+
+    def feature_extraction(self):
+        pass
 
     def classification(self):
-        classifier = NaiveBayesClassifier.train(self.train_feats)
-        print 'accuracy:', nltk.classify.util.accuracy(classifier, self.test_feats)
+
+        classifier = NaiveBayesClassifier.train(self.train_reviews)
+        print 'accuracy:', nltk.classify.util.accuracy(classifier, self.test_reviews)
         classifier.show_most_informative_features() 
 
 
@@ -67,13 +71,15 @@ class sample_nltk:
         pos_reviews_words_list = neg_reviews_words_list = []
 
         for review in reviews_list:
+            words_list = []
+
             if not review:
                 continue
 
             label = review[0]
             if int(label) >= 7:
                 label = True
-            else if int(label) <=4:
+            elif int(label) <=4:
                 label = False
             else:
                 label = False
@@ -83,7 +89,9 @@ class sample_nltk:
                     if not word_freq_pair:
                         continue
                     word_id = str(word_freq_pair.split(":")[0])
-                    word = self.id_to_word_dict.get(word_id)
+                    word = self.id_to_word_dict.get(int(word_id))
+                    if not word:
+                        continue
                     words_list.append(word)
                 pos_reviews_words_list.append(words_list)
             else: 
@@ -91,21 +99,48 @@ class sample_nltk:
                     if not word_freq_pair:
                         continue
                     word_id = str(word_freq_pair.split(":")[0])
-                    word = self.id_to_word_dict.get(word_id)
+                    word = self.id_to_word_dict.get(int(word_id))
+                    if not word:
+                        continue
                     words_list.append(word)
                 neg_reviews_words_list.append(word)
-            return (pos_reviews_words_list, neg_reviews_words_list)
+        return (pos_reviews_words_list, neg_reviews_words_list)
+
 
     def tag_words_with_labels(self, pos_reviews_words, neg_reviews_words):
-        pos_tagged_words = [(self.tag_words(word_list),'pos') for word_list in pos_reviews_words]
-        neg_tagged_words = [(self.tag_words(word_list),'neg') for word_list in neg_reviews_words]
-        return (pos_tagged_words, neg_tagged_words)
+        pos_tagged_words = neg_tagged_words = []
+
+
+        for word_list in pos_reviews_words:
+            word_dict = self.tag_words(word_list)
+            if not word_dict:
+                continue
+            pos_tagged_words.append((word_dict, 'pos'))
         
- 
+        for word_list in neg_reviews_words:
+            neg_word_dict = self.tag_words(word_list)
+            if not word_dict:
+                continue
+            neg_tagged_words.append((word_dict, 'neg'))
+
+        return(pos_tagged_words, neg_tagged_words) 
+
+
+    def tag_words(self, words_list):
+        tag_word_list = []
+
+        if type(words_list) != list:
+            return dict()
+
+        for word in words_list:
+            word_tuple = (word, True)
+            tag_word_list.append(word_tuple)
+
+        return dict(tag_word_list)
+
     def initialize_logger(self):
         logging.basicConfig(filename=self.logger_file, level=logging.INFO)
         logging.info("Initialized logger")
-
 
     def parse_reviews(self):
         self.open_files()
@@ -119,7 +154,7 @@ class sample_nltk:
 
     def load_data(self):
         self.load_bow()
-        self.reviews_list = self.load_feat(self.feat)
+        self.train_reviews_list = self.load_feat(self.feat)
         self.test_reviews_list = self.load_feat(self.test_feat)
         self.load_stop_words() 
 
