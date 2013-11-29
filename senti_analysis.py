@@ -63,6 +63,7 @@ class sample_nltk:
     def classification(self):
 
         classifier = NaiveBayesClassifier.train(self.train_reviews)
+
         print 'accuracy:', nltk.classify.util.accuracy(classifier, self.test_reviews)
         classifier.show_most_informative_features() 
 
@@ -108,7 +109,8 @@ class sample_nltk:
 
 
     def tag_words_with_labels(self, pos_reviews_words, neg_reviews_words):
-        pos_tagged_words = neg_tagged_words = []
+        pos_tagged_words = []
+        neg_tagged_words = []
 
 
         for word_list in pos_reviews_words:
@@ -116,12 +118,12 @@ class sample_nltk:
             if not word_dict:
                 continue
             pos_tagged_words.append((word_dict, 'pos'))
-        
+      
         for word_list in neg_reviews_words:
             neg_word_dict = self.tag_words(word_list)
-            if not word_dict:
+            if not neg_word_dict:
                 continue
-            neg_tagged_words.append((word_dict, 'neg'))
+            neg_tagged_words.append((neg_word_dict, 'neg'))
 
         return(pos_tagged_words, neg_tagged_words) 
 
