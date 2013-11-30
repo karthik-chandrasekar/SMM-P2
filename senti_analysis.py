@@ -1,3 +1,4 @@
+from nltk.featstruct import FeatStruct, FeatList, FeatDict
 import nltk, os, logging, json, ConfigParser, codecs
 import nltk.classify.util
 from nltk.classify import NaiveBayesClassifier
@@ -59,8 +60,8 @@ class sample_nltk:
 
     def classification(self):
 
-        import pdb;pdb.set_trace()
-        classifier = NaiveBayesClassifier.train(self.train_reviews)
+        fstruct = FeatStruct(self.train_reviews)
+        classifier = NaiveBayesClassifier.train(fstruct)
 
         print 'accuracy:', nltk.classify.util.accuracy(classifier, self.test_reviews)
         classifier.show_most_informative_features() 
@@ -115,13 +116,13 @@ class sample_nltk:
             word_dict = self.tag_words(word_list)
             if not word_dict:
                 continue
-            pos_tagged_words.append([word_dict, 'pos'])
+            pos_tagged_words.append((word_dict, 'pos'))
       
         for word_list in neg_reviews_words:
             neg_word_dict = self.tag_words(word_list)
             if not neg_word_dict:
                 continue
-            neg_tagged_words.append([neg_word_dict, 'neg'])
+            neg_tagged_words.append((neg_word_dict, 'neg'))
 
         return(pos_tagged_words, neg_tagged_words) 
 
