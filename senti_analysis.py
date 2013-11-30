@@ -15,7 +15,6 @@ class sample_nltk:
         self.feat_file_name = self.config.get('GLOBAL', 'feat_file_name')
         self.test_feat_file_dir = self.config.get('GLOBAL', 'test_feat_file_dir')
         self.test_feat_file_name = self.config.get('GLOBAL', 'test_feat_file_name')
-    
 
         self.preprocessing_results_dir = self.config.get('PRE_PROCESSING', 'pre_processing_results_dir')
         self.preprocessing_results_file_name = self.config.get('PRE_PROCESSING', 'pre_processing_results_file_name')
@@ -41,17 +40,15 @@ class sample_nltk:
     def preprocessing(self):
         self.initialize_logger()
         self.parse_reviews()
-        self.remove_stop_words()
-        self.do_stemming()
+        #self.remove_stop_words()
+        #self.do_stemming()
         #self.dump_preprocessing()
 
     def feature_selection(self):
 
-
         self.pos_reviews, self.neg_reviews = self.get_labelled_reviews_words(self.train_reviews_list)
         self.test_pos_reviews, self.test_neg_reviews = self.get_labelled_reviews_words(self.test_reviews_list)
       
-
         self.pos_tagged_reviews, self.neg_tagged_reviews = self.tag_words_with_labels(self.pos_reviews, self.neg_reviews) 
         self.test_pos_tagged_reviews, self.test_neg_tagged_reviews = self.tag_words_with_labels(self.test_pos_reviews, self.test_neg_reviews)    
         self.train_reviews = self.pos_tagged_reviews + self.neg_tagged_reviews
@@ -62,6 +59,7 @@ class sample_nltk:
 
     def classification(self):
 
+        import pdb;pdb.set_trace()
         classifier = NaiveBayesClassifier.train(self.train_reviews)
 
         print 'accuracy:', nltk.classify.util.accuracy(classifier, self.test_reviews)
@@ -117,13 +115,13 @@ class sample_nltk:
             word_dict = self.tag_words(word_list)
             if not word_dict:
                 continue
-            pos_tagged_words.append((word_dict, 'pos'))
+            pos_tagged_words.append([word_dict, 'pos'])
       
         for word_list in neg_reviews_words:
             neg_word_dict = self.tag_words(word_list)
             if not neg_word_dict:
                 continue
-            neg_tagged_words.append((neg_word_dict, 'neg'))
+            neg_tagged_words.append([neg_word_dict, 'neg'])
 
         return(pos_tagged_words, neg_tagged_words) 
 
@@ -150,9 +148,9 @@ class sample_nltk:
         self.close_files()
 
     def open_files(self):
-        self.bow = codecs.open(os.path.join(self.bag_of_words_file_dir, self.bag_of_words_file_name), 'r', 'utf-8')
-        self.feat = codecs.open(os.path.join(self.feat_file_dir, self.feat_file_name), 'r', 'utf-8')
-        self.test_feat = codecs.open(os.path.join(self.test_feat_file_dir, self.test_feat_file_name), 'r', 'utf-8')
+        self.bow = open(os.path.join(self.bag_of_words_file_dir, self.bag_of_words_file_name), 'r')
+        self.feat = open(os.path.join(self.feat_file_dir, self.feat_file_name), 'r')
+        self.test_feat = open(os.path.join(self.test_feat_file_dir, self.test_feat_file_name), 'r')
 
     def load_data(self):
         self.load_bow()
@@ -202,7 +200,7 @@ class sample_nltk:
             self.id_to_word_dict[uniq_id] = stemmer.stem(word)
 
     def dump_preprocessing(self):
-        fd = codecs.open(self.preprocessing_results_file, 'w', 'utf-8')
+        fd = open(self.preprocessing_results_file, 'w', 'utf-8')
         fd.write(json.dumps(self.id_to_word_dict))
         fd.close()
 
