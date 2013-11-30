@@ -134,9 +134,6 @@ class sample_nltk:
     def tag_words(self, words_list):
         tag_word_list = []
 
-        if type(words_list) != list:
-            return dict()
-
         for word in words_list:
             word_tuple = (word, True)
             tag_word_list.append(word_tuple)
