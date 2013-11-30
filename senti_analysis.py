@@ -47,11 +47,14 @@ class sample_nltk:
 
     def feature_selection(self):
 
-        self.pos_reviews, self.neg_reviews = self.get_labelled_reviews_words(self.train_reviews_list)
-        self.test_pos_reviews, self.test_neg_reviews = self.get_labelled_reviews_words(self.test_reviews_list)
+        #Collect positive and negative reviews
+        self.pos_reviews, self.neg_reviews = self.get_labelled_reviews(self.train_reviews_list)
+        self.test_pos_reviews, self.test_neg_reviews = self.get_labelled_reviews(self.test_reviews_list)
       
+        #Format it acc to classifier input
         self.pos_tagged_reviews, self.neg_tagged_reviews = self.tag_words_with_labels(self.pos_reviews, self.neg_reviews) 
         self.test_pos_tagged_reviews, self.test_neg_tagged_reviews = self.tag_words_with_labels(self.test_pos_reviews, self.test_neg_reviews)    
+        #Since polarity is labelled, we can combine both positive and negative reviews
         self.train_reviews = self.pos_tagged_reviews + self.neg_tagged_reviews
         self.test_reviews = self.test_pos_tagged_reviews + self.test_neg_tagged_reviews  
 
@@ -67,8 +70,8 @@ class sample_nltk:
         classifier.show_most_informative_features() 
 
 
-    def get_labelled_reviews_words(self, reviews_list):
-        pos_reviews_words_list = neg_reviews_words_list = []
+    def get_labelled_reviews(self, reviews_list):
+        pos_reviews_list = neg_reviews_list = []
 
         for review in reviews_list:
             words_list = []
@@ -88,38 +91,39 @@ class sample_nltk:
                 for word_freq_pair in review.split(" ")[1:]:
                     if not word_freq_pair:
                         continue
-                    word_id = str(word_freq_pair.split(":")[0])
+                    word_id = word_freq_pair.split(":")[0]
                     word = self.id_to_word_dict.get(int(word_id))
                     if not word:
                         continue
                     words_list.append(word)
-                pos_reviews_words_list.append(words_list)
+                pos_reviews_list.append(words_list)
+
             else: 
                 for word_freq_pair in review.split(" ")[1:]:
                     if not word_freq_pair:
                         continue
-                    word_id = str(word_freq_pair.split(":")[0])
+                    word_id = word_freq_pair.split(":")[0]
                     word = self.id_to_word_dict.get(int(word_id))
                     if not word:
                         continue
                     words_list.append(word)
-                neg_reviews_words_list.append(word)
-        return (pos_reviews_words_list, neg_reviews_words_list)
+                neg_reviews_list.append(words_list)
+
+        return (pos_reviews_list, neg_reviews_list)
 
 
-    def tag_words_with_labels(self, pos_reviews_words, neg_reviews_words):
+    def tag_words_with_labels(self, pos_reviews, neg_reviews):
         pos_tagged_words = []
         neg_tagged_words = []
 
-
-        for word_list in pos_reviews_words:
-            word_dict = self.tag_words(word_list)
+        for review in pos_reviews:
+            word_dict = self.tag_words(review)
             if not word_dict:
                 continue
             pos_tagged_words.append((word_dict, 'pos'))
       
-        for word_list in neg_reviews_words:
-            neg_word_dict = self.tag_words(word_list)
+        for review in neg_reviews:
+            neg_word_dict = self.tag_words(review)
             if not neg_word_dict:
                 continue
             neg_tagged_words.append((neg_word_dict, 'neg'))
@@ -157,7 +161,7 @@ class sample_nltk:
         self.load_bow()
         self.train_reviews_list = self.load_feat(self.feat)
         self.test_reviews_list = self.load_feat(self.test_feat)
-        self.load_stop_words() 
+        #self.load_stop_words() 
 
     def load_bow(self):
         uniq_id = 0
@@ -171,14 +175,12 @@ class sample_nltk:
 
  
     def load_feat(self, fd):
-        uniq_id = 0
         reviews_list = []
 
         for line in fd.readlines():
             if not line:
                 continue
             reviews_list.append(line.strip())  #First value in this line hold the labeled value
-            uniq_id += 1            
         logging.info("total reviews  - length - %s" % (len(reviews_list)))
         return reviews_list
 
