@@ -7,7 +7,6 @@ class movie_sentiment:
     def __init__(self):
         self.config = ConfigParser.ConfigParser()
         self.config.read("senti_analysis.config")
-        print "Karthik Chandrasekar"
 
         #File names:
         cur_dir = os.getcwd()
@@ -97,17 +96,67 @@ class movie_sentiment:
         pos_test_features = self.selected_pos_feats[4000:]
         neg_test_features = self.selected_neg_feats[4000:]
 
-        train_features = pos_train_features + neg_train_features
-        test_features = pos_test_features + neg_test_features
+        self.train_features = pos_train_features + neg_train_features
+        self.test_features = pos_test_features + neg_test_features
 
 
-        classifier = NaiveBayesClassifier.train(train_features)
-        print 'accuracy:', nltk.classify.util.accuracy(classifier, test_features)
-        classifier.show_most_informative_features()
+        self.classifier = NaiveBayesClassifier.train(self.train_features)
+        print 'accuracy:', nltk.classify.util.accuracy(self.classifier, self.test_features)
+        self.classifier.show_most_informative_features()
 
     def testing(self):
-        pass
+        self.load_test_and_predicted_values()
+        self.find_precision()
+        self.find_recall()
+        self.find_fmeasure()
 
+
+    def load_test_and_predicted_values(self):
+        #Find the precision and recall
+        self.actual_polarity_dict = {}
+        self.predicted_polarity_dict = {}
+
+        for i, (features, label) in enumerate(self.test_features):
+            self.actual_polarity_dict.setdefault(label, set()).add(i)
+            predicted_polarity = self.classifier.classify(features)
+            self.predicted_polarity_dict.setdefault(predicted_polarity, set()).add(i)
+
+    def find_precision(self):
+        self.pos_precision()
+        self.neg_precision()   
+
+    def pos_precision(self):
+        self.pos_val_precision = nltk.metrics.precision(self.actual_polarity_dict['pos'], self.predicted_polarity_dict['pos'])
+        print "Pos values preicsiion %s" % (self.pos_val_precision)
+
+    def neg_precision(self):
+        self.neg_val_precision = nltk.metrics.precision(self.actual_polarity_dict['neg'], self.predicted_polarity_dict['neg'])
+        print "Neg values preicsiion %s" % (self.neg_val_precision)
+
+
+    def find_recall(self):
+        self.pos_recall()
+        self.neg_recall()
+
+    def pos_recall(self):
+        self.pos_val_recall = nltk.metrics.recall(self.actual_polarity_dict['pos'], self.predicted_polarity_dict['pos'])
+        print "Pos values recall %s" % (self.pos_val_recall)
+
+    def neg_recall(self):
+        self.neg_val_recall = nltk.metrics.recall(self.actual_polarity_dict['neg'], self.predicted_polarity_dict['neg'])
+        print "Neg values recall %s" % (self.neg_val_recall) 
+
+    def find_fmeasure(self):
+        self.pos_fmeasure()
+        self.neg_fmeasure()
+
+    def pos_fmeasure(self):
+        pos_fmeasure_val = 2 * (self.pos_val_precision * self.pos_val_recall) / float(self.pos_val_precision + self.pos_val_recall)          
+        print "F measure for pos val %s" % (pos_fmeasure_val)           
+ 
+    def neg_fmeasure(self):
+        neg_fmeasure_val = 2 * (self.neg_val_precision * self.neg_val_recall) / float(self.neg_val_precision + self.neg_val_recall)          
+        print "F measure for neg val %s" % (neg_fmeasure_val)
 
 if __name__ == "__main__":
     ms = movie_sentiment()
