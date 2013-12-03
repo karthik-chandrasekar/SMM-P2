@@ -1,7 +1,9 @@
 import nltk.classify.util
 from nltk.classify import NaiveBayesClassifier
 import nltk, os, logging, json, ConfigParser, codecs
-
+from sklearn.svm import LinearSVC
+from nltk.classify.scikitlearn import SklearnClassifier
+from sklearn.metrics import classification_report
 
 class movie_sentiment:
     def __init__(self):
@@ -87,7 +89,7 @@ class movie_sentiment:
         for review in self.neg_rev_fd.readlines():
             self.neg_reviews_list.append(review)
 
-        self.load_dataset_two()
+        #self.load_dataset_two()
         #self.load_d2_reviews()
 
 
@@ -189,62 +191,115 @@ class movie_sentiment:
 
         self.train_features = pos_train_features + neg_train_features
         self.test_features = pos_test_features + neg_test_features
+        
+        #NaiveBayesClassfication
+        self.NaiveBayesClassification(self.train_features, self.test_features)
+        
+        #Support vecotr machine
+        self.SVMClassification(self.train_features, self.test_features)
 
-        self.classifier = NaiveBayesClassifier.train(self.train_features)
-        print 'accuracy:', nltk.classify.util.accuracy(self.classifier, self.test_features)
-        self.classifier.show_most_informative_features()
+    def NaiveBayesClassification(self, train_features, test_features):
+
+        #Training
+        self.nb_classifier = NaiveBayesClassifier.train(train_features)
+        import pdb;pdb.set_trace()
+
+        #Testing
+        print 'accuracy:', nltk.classify.util.accuracy(self.nb_classifier, test_features)
+        self.nb_classifier.show_most_informative_features()
+
+    def SVMClassification(self, train_features, test_features):
+        test_feat_list = []
+        test_feat_labels_list = []        
+
+        #Training
+        self.svm_classifier = SklearnClassifier(LinearSVC()) 
+        self.svm_classifier.train(train_features)
+        
+
+        #Testing
+        for test_feat in test_features:
+            test_feat_list.append(test_feat[0])
+            test_feat_labels_list.append(test_feat[1])            
+
+        svm_test = self.svm_classifier.batch_classify(test_feat_list)
+        
+        print "SVM Classification"
+        print classification_report(test_feat_labels_list, svm_test, labels=['pos','neg'], target_names=['pos', 'neg'])
 
     def testing(self):
-        self.load_test_and_predicted_values()
-        self.find_precision()
-        self.find_recall()
-        self.find_fmeasure()
 
-    def load_test_and_predicted_values(self):
+        print "Naive Bayes \n"
+
+        #Naive bayes
+        actual_pol_dict, predicted_pol_dict = self.load_test_and_predicted_values(self.nb_classifier)
+        pos_precision, neg_precision = self.find_precision(actual_pol_dict, predicted_pol_dict)
+        pos_recall, neg_recall = self.find_recall(actual_pol_dict, predicted_pol_dict)
+        self.find_fmeasure(pos_precision, neg_precision, pos_recall, neg_recall)
+
+
+        print " Support vector machine \n"
+
+        #Support Vector Machine
+        actual_pol_dict, predicted_pol_dict = self.load_test_and_predicted_values(self.svm_classifier)
+        pos_precision, neg_precision = self.find_precision(actual_pol_dict, predicted_pol_dict)
+        pos_recall, neg_recall = self.find_recall(actual_pol_dict, predicted_pol_dict)
+        self.find_fmeasure(pos_precision, neg_precision, pos_recall, neg_recall)
+        
+
+    def load_test_and_predicted_values(self, classifier):
         #Find the precision and recall
-        self.actual_polarity_dict = {}
-        self.predicted_polarity_dict = {}
+        actual_polarity_dict = {}
+        predicted_polarity_dict = {}
 
         for i, (features, label) in enumerate(self.test_features):
-            self.actual_polarity_dict.setdefault(label, set()).add(i)
-            predicted_polarity = self.classifier.classify(features)
-            self.predicted_polarity_dict.setdefault(predicted_polarity, set()).add(i)
+            actual_polarity_dict.setdefault(label, set()).add(i)
+            predicted_polarity = classifier.classify(features)
+            predicted_polarity_dict.setdefault(predicted_polarity, set()).add(i)
 
-    def find_precision(self):
-        self.pos_precision()
-        self.neg_precision()   
-
-    def pos_precision(self):
-        self.pos_val_precision = nltk.metrics.precision(self.actual_polarity_dict['pos'], self.predicted_polarity_dict['pos'])
-        print "Pos values preicsiion %s" % (self.pos_val_precision)
-
-    def neg_precision(self):
-        self.neg_val_precision = nltk.metrics.precision(self.actual_polarity_dict['neg'], self.predicted_polarity_dict['neg'])
-        print "Neg values preicsiion %s" % (self.neg_val_precision)
+        return (actual_polarity_dict, predicted_polarity_dict)
 
 
-    def find_recall(self):
-        self.pos_recall()
-        self.neg_recall()
+    def find_precision(self, actual_polarity_dict, predicted_polarity_dict):
+        pos_precision = self.pos_precision(actual_polarity_dict, predicted_polarity_dict)
+        neg_precision = self.neg_precision(actual_polarity_dict, predicted_polarity_dict)   
+        return (pos_precision, neg_precision)
 
-    def pos_recall(self):
-        self.pos_val_recall = nltk.metrics.recall(self.actual_polarity_dict['pos'], self.predicted_polarity_dict['pos'])
-        print "Pos values recall %s" % (self.pos_val_recall)
+    def pos_precision(self, actual_polarity_dict, predicted_polarity_dict):
+        pos_val_precision = nltk.metrics.precision(actual_polarity_dict['pos'], predicted_polarity_dict['pos'])
+        print "Pos values preicsiion %s" % (pos_val_precision)
+        return pos_val_precision
 
-    def neg_recall(self):
-        self.neg_val_recall = nltk.metrics.recall(self.actual_polarity_dict['neg'], self.predicted_polarity_dict['neg'])
-        print "Neg values recall %s" % (self.neg_val_recall) 
+    def neg_precision(self, actual_polarity_dict, predicted_polarity_dict):
+        neg_val_precision = nltk.metrics.precision(actual_polarity_dict['neg'], predicted_polarity_dict['neg'])
+        print "Neg values preicsiion %s" % (neg_val_precision)
+        return neg_val_precision
 
-    def find_fmeasure(self):
-        self.pos_fmeasure()
-        self.neg_fmeasure()
+    def find_recall(self, actual_polarity_dict, predicted_polarity_dict):
+        pos_recall = self.pos_recall(actual_polarity_dict, predicted_polarity_dict)
+        neg_recall = self.neg_recall(actual_polarity_dict, predicted_polarity_dict)
+        return (pos_recall, neg_recall)
 
-    def pos_fmeasure(self):
-        pos_fmeasure_val = 2 * (self.pos_val_precision * self.pos_val_recall) / float(self.pos_val_precision + self.pos_val_recall)          
+    def pos_recall(self, actual_polarity_dict, predicted_polarity_dict):
+        pos_val_recall = nltk.metrics.recall(actual_polarity_dict['pos'], predicted_polarity_dict['pos'])
+        print "Pos values recall %s" % (pos_val_recall) 
+        return pos_val_recall
+
+    def neg_recall(self, actual_polarity_dict, predicted_polarity_dict):
+        neg_val_recall = nltk.metrics.recall(actual_polarity_dict['neg'], predicted_polarity_dict['neg'])
+        print "Neg values recall %s" % (neg_val_recall) 
+        return neg_val_recall
+
+    def find_fmeasure(self, pos_precision, neg_precision, pos_recall, neg_recall):
+        self.pos_fmeasure(pos_precision, pos_recall)
+        self.neg_fmeasure(neg_precision, neg_recall)
+
+    def pos_fmeasure(self, pos_precision, pos_recall):
+        pos_fmeasure_val = 2 * (pos_precision * pos_recall) / float(pos_precision + pos_recall)          
         print "F measure for pos val %s" % (pos_fmeasure_val)           
  
-    def neg_fmeasure(self):
-        neg_fmeasure_val = 2 * (self.neg_val_precision * self.neg_val_recall) / float(self.neg_val_precision + self.neg_val_recall)          
+    def neg_fmeasure(self, neg_precision, neg_recall):
+        neg_fmeasure_val = 2 * (neg_precision * neg_recall) / float(neg_precision + neg_recall)          
         print "F measure for neg val %s" % (neg_fmeasure_val)
 
 if __name__ == "__main__":
