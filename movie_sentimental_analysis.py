@@ -3,7 +3,9 @@ from nltk.classify import NaiveBayesClassifier
 import nltk, os, logging, json, ConfigParser, codecs
 from sklearn.svm import LinearSVC
 from nltk.classify.scikitlearn import SklearnClassifier
+from nltk.probability import FreqDist, ConditionalFreqDist
 from sklearn.metrics import classification_report
+from nltk.metrics import BigramAssocMeasures
 
 class movie_sentiment:
     def __init__(self):
@@ -154,10 +156,45 @@ class movie_sentiment:
     def feature_selection(self, features_list):
         selected_feat_list = []
         for feat in features_list:
-            selected_feat_list.append((feat, True))
+            if feat  and feat.lower() in self.bestwords:
+                selected_feat_list.append((feat, True))
         return dict(selected_feat_list)
        
+
+    def compute_word_scores(self):
+       
+        self.bestwords = set()
+ 
+        fd_obj = FreqDist()
+        cf_obj = ConditionalFreqDist()
+
+        for review in self.pos_reviews_list:
+            for word in review.split():
+                fd_obj.inc(word.lower())
+                cf_obj['pos'].inc(word.lower())
+
+        for review in self.neg_reviews_list:
+            for word in review.split():
+                fd_obj.inc(word.lower())
+                cf_obj['neg'].inc(word.lower())
+
+        pos_word_count = cf_obj['pos'].N()
+        neg_word_count = cf_obj['neg'].N()
+        total_word_count = pos_word_count + neg_word_count
+        
+        word_score_dict = {}
+
+        for word, freq in fd_obj.iteritems():
+            pos_score = BigramAssocMeasures.chi_sq(cf_obj['pos'][word], (freq, pos_word_count), total_word_count)
+            neg_score = BigramAssocMeasures.chi_sq(cf_obj['neg'][word], (freq, neg_word_count), total_word_count)
+            word_score_dict[word] = pos_score + neg_score 
+
+            best = sorted(word_score_dict.iteritems(), key=lambda (w,s): s, reverse=True)[:10000]
+            self.bestwords = set([w for w, s in best])       
+
+
     def feature_extraction(self):
+        self.compute_word_scores()
         self.pos_feat_extraction()
         self.neg_feat_extraction()
 
