@@ -202,7 +202,6 @@ class movie_sentiment:
 
         #Training
         self.nb_classifier = NaiveBayesClassifier.train(train_features)
-        import pdb;pdb.set_trace()
 
         #Testing
         print 'accuracy:', nltk.classify.util.accuracy(self.nb_classifier, test_features)
