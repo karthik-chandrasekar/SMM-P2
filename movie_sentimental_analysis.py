@@ -48,15 +48,26 @@ class movie_sentiment:
         self.neg_reviews_list = []
         self.bow_dict = {}
 
+        self.all_feat = 0
+
     def initialize_logger(self):
         logging.basicConfig(filename=self.logger_file, level=logging.INFO)
         logging.info("Initialized logger")
 
     def run_main(self):
         self.preprocessing()
-        self.feature_extraction()
-        self.classification()
-        self.testing()
+        self.compute_word_scores()
+        
+        words_selection_dict = {"top_100":100, "top_500":500, "top_1000":1000, "top_5000":5000, "top_10000":10000, "top_20000":20000, "all_words":0}
+
+        for key, words_count in  words_selection_dict.iteritems(): 
+            print "Training classifier on  %s" % (key)
+            if key == "all_words":
+                self.all_feat = 1
+            self.words_count = words_count
+            self.feature_extraction()
+            self.classification()
+            self.testing()
 
     def preprocessing(self):
         self.initialize_logger()
@@ -155,6 +166,8 @@ class movie_sentiment:
 
     def feature_selection(self, features_list):
         selected_feat_list = []
+        self.bestwords = list(set([w for w, s in self.best[:self.words_count]]))       
+        
         for feat in features_list:
             if feat  and feat.lower() in self.bestwords:
                 selected_feat_list.append((feat, True))
@@ -163,7 +176,7 @@ class movie_sentiment:
 
     def compute_word_scores(self):
        
-        self.bestwords = set()
+        self.bestwords = []
  
         fd_obj = FreqDist()
         cf_obj = ConditionalFreqDist()
@@ -189,12 +202,16 @@ class movie_sentiment:
             neg_score = BigramAssocMeasures.chi_sq(cf_obj['neg'][word], (freq, neg_word_count), total_word_count)
             word_score_dict[word] = pos_score + neg_score 
 
-            best = sorted(word_score_dict.iteritems(), key=lambda (w,s): s, reverse=True)[:10000]
-            self.bestwords = set([w for w, s in best])       
+            if not self.all_feat:
+                self.best = sorted(word_score_dict.iteritems(), key=lambda (w,s): s, reverse=True)
+            else:
+                self.best = sorted(word_score_dict.iteritems(), key=lambda (w,s): s, reverse=True)
+                self.all_feat = 0
+
 
 
     def feature_extraction(self):
-        self.compute_word_scores()
+
         self.pos_feat_extraction()
         self.neg_feat_extraction()
 
