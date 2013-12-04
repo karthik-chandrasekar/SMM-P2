@@ -6,6 +6,7 @@ from nltk.classify.scikitlearn import SklearnClassifier
 from nltk.probability import FreqDist, ConditionalFreqDist
 from sklearn.metrics import classification_report
 from nltk.metrics import BigramAssocMeasures
+from nltk.collocations import BigramCollocationFinder
 
 class movie_sentiment:
     def __init__(self):
@@ -47,8 +48,9 @@ class movie_sentiment:
         self.pos_reviews_list = []
         self.neg_reviews_list = []
         self.bow_dict = {}
+        #self.words_selection_dict = {"top_100":100, "top_500":500, "top_1000":1000, "top_5000":5000, "top_10000":10000, "top_20000":20000, "bigram":0, "all_words":0}
+        self.words_selection_dict = {"bigram":10000} 
 
-        self.all_feat = 0
 
     def initialize_logger(self):
         logging.basicConfig(filename=self.logger_file, level=logging.INFO)
@@ -56,15 +58,22 @@ class movie_sentiment:
 
     def run_main(self):
         self.preprocessing()
-        self.compute_word_scores()
         
-        words_selection_dict = {"top_100":100, "top_500":500, "top_1000":1000, "top_5000":5000, "top_10000":10000, "top_20000":20000, "all_words":0}
+        # Classifier is trained on all features, specific number of top features sorted by frequency, bigram features 
 
-        for key, words_count in  words_selection_dict.iteritems(): 
+        for key, words_count in  self.words_selection_dict.iteritems():
+
+            self.all_feat = self.bigram_active = self.best_feat = 0 
             print "Training classifier on  %s" % (key)
+
             if key == "all_words":
                 self.all_feat = 1
+            elif key == "bigram":
+                self.bigram_active = 1
+            else:
+                self.best_feat = 1
             self.words_count = words_count
+
             self.feature_extraction()
             self.classification()
             self.testing()
@@ -74,6 +83,7 @@ class movie_sentiment:
         self.open_files()
         self.load_data()
         self.close_files()        
+        self.compute_word_scores()
 
     def open_files(self):
         self.pos_rev_fd = open(self.pos_rev_file, 'r')
@@ -174,6 +184,28 @@ class movie_sentiment:
         return dict(selected_feat_list)
        
 
+    def all_feature_selection(self, features_list):
+        selected_feat_list = []
+        
+        for feat in features_list:
+            if feat:
+                selected_feat_list.append((feat, True))
+        return dict(selected_feat_list)
+
+    def bigram_feature_selection(self, features_list):
+
+    
+        score = BigramAssocMeasures.chi_sq
+        n = 200
+        
+        all_bigrams = BigramCollocationFinder.from_words(features_list)
+        best_bigrams = all_bigrams.nbest(score, n)
+        selected_bigrams = dict([(bigram, True) for bigram in best_bigrams])
+        selected_monograms = self.feature_selection(features_list)
+        
+        selected_bigrams.update(selected_monograms) 
+        return selected_bigrams
+
     def compute_word_scores(self):
        
         self.bestwords = []
@@ -202,11 +234,7 @@ class movie_sentiment:
             neg_score = BigramAssocMeasures.chi_sq(cf_obj['neg'][word], (freq, neg_word_count), total_word_count)
             word_score_dict[word] = pos_score + neg_score 
 
-            if not self.all_feat:
-                self.best = sorted(word_score_dict.iteritems(), key=lambda (w,s): s, reverse=True)
-            else:
-                self.best = sorted(word_score_dict.iteritems(), key=lambda (w,s): s, reverse=True)
-                self.all_feat = 0
+            self.best = sorted(word_score_dict.iteritems(), key=lambda (w,s): s, reverse=True)
 
 
 
@@ -215,16 +243,27 @@ class movie_sentiment:
         self.pos_feat_extraction()
         self.neg_feat_extraction()
 
-
     def pos_feat_extraction(self):
         self.selected_pos_feats = []
 
         #Select positive features
         for review in self.pos_reviews_list:
             review_words = review.split(" ")
-            selected_review_words = self.feature_selection(review_words)
+
+            # Top n best features are selected
+            if self.best_feat:
+                selected_review_words = self.feature_selection(review_words) 
+           
+            # All features are selected
+            elif self.all_feat:
+                selected_review_words = self.all_feature_selection(review_words)
+        
+            # Bigram features are selected along with top n best features
+            elif self.bigram_active:
+                selected_review_words = self.bigram_feature_selection(review_words)
+
             self.selected_pos_feats.append((selected_review_words, 'pos'))
-    
+        
 
     def neg_feat_extraction(self):
         self.selected_neg_feats = []
@@ -232,8 +271,21 @@ class movie_sentiment:
         #Selecte negative features
         for review in self.neg_reviews_list:
             review_words = review.split(" ")
-            selected_review_words = self.feature_selection(review_words) 
+
+            # Top n best features are selected
+            if self.best_feat:
+                selected_review_words = self.feature_selection(review_words) 
+           
+            # All features are selected
+            elif self.all_feat:
+                selected_review_words = self.all_feature_selection(review_words)
+    
+            # Bigram features are selected along with the top n best features
+            elif self.bigram_active:
+                selected_review_words = self.bigram_feature_selection(review_words)
+
             self.selected_neg_feats.append((selected_review_words, 'neg'))
+
 
     def classification(self):
        
@@ -246,13 +298,14 @@ class movie_sentiment:
         self.train_features = pos_train_features + neg_train_features
         self.test_features = pos_test_features + neg_test_features
         
-        #NaiveBayesClassfication
+        #NaiveBayes Classfication
         self.NaiveBayesClassification(self.train_features, self.test_features)
         
-        #Support vecotr machine
+        #Support vecotr machine Classification
         self.SVMClassification(self.train_features, self.test_features)
 
     def NaiveBayesClassification(self, train_features, test_features):
+        
 
         #Training
         self.nb_classifier = NaiveBayesClassifier.train(train_features)
@@ -269,7 +322,6 @@ class movie_sentiment:
         self.svm_classifier = SklearnClassifier(LinearSVC()) 
         self.svm_classifier.train(train_features)
         
-
         #Testing
         for test_feat in test_features:
             test_feat_list.append(test_feat[0])
