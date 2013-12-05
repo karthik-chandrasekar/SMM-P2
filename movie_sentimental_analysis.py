@@ -54,8 +54,6 @@ class movie_sentiment:
         self.stopwords_set = set(stopwords.words('english'))    
         self.stemmer = nltk.stem.PorterStemmer()
         
-
-
     def initialize_logger(self):
         logging.basicConfig(filename=self.logger_file, level=logging.INFO)
         logging.info("Initialized logger")
@@ -116,7 +114,7 @@ class movie_sentiment:
         for review in self.neg_rev_fd.readlines():
             self.neg_reviews_list.append(review)
 
-        #self.load_dataset_two()
+        self.load_dataset_two()
         #self.load_d2_reviews()
 
 
@@ -236,12 +234,15 @@ class movie_sentiment:
         word_score_dict = {}
 
         for word, freq in fd_obj.iteritems():
-          
+         
+            if freq < 3:
+                continue
+ 
             pos_score = BigramAssocMeasures.chi_sq(cf_obj['pos'][word], (freq, pos_word_count), total_word_count)
             neg_score = BigramAssocMeasures.chi_sq(cf_obj['neg'][word], (freq, neg_word_count), total_word_count)
             word_score_dict[word] = pos_score + neg_score 
 
-            self.best = sorted(word_score_dict.iteritems(), key=lambda (w,s): s, reverse=True)
+        self.best = sorted(word_score_dict.iteritems(), key=lambda (w,s): s, reverse=True)
 
 
     def feature_extraction(self):
@@ -249,16 +250,15 @@ class movie_sentiment:
         self.pos_feat_extraction()
         self.neg_feat_extraction()
 
-
     def apply_preprocessing(self, review):
 
         cleaned_review = []
        
         for word in review.split():
-            if word and word not in self.stopwords_set:
-                if word.isalnum():
-                    #root_word = self.stemmer.stem(word)
-                    cleaned_review.append(word.lower())
+            if word :
+                if word.isalpha():
+                    root_word = self.stemmer.stem(word)
+                    cleaned_review.append(root_word.lower())
 
         return cleaned_review 
 
@@ -308,12 +308,20 @@ class movie_sentiment:
 
 
     def classification(self):
-       
-        pos_train_features = self.selected_pos_feats[:4000]
-        neg_train_features = self.selected_neg_feats[:4000]        
+      
+        #Let us used 75 %  of data for training and 25 % for testing
+
+        pos_feats_count = int(len(self.selected_pos_feats) * 0.75)
+        neg_feats_count = int(len(self.selected_neg_feats) * 0.75)
  
-        pos_test_features = self.selected_pos_feats[4000:]
-        neg_test_features = self.selected_neg_feats[4000:]
+        print "pos feats count : %s" % (pos_feats_count)
+        print "neg feats count : %s" % (neg_feats_count)
+
+        pos_train_features = self.selected_pos_feats[:pos_feats_count]
+        neg_train_features = self.selected_neg_feats[:neg_feats_count]        
+ 
+        pos_test_features = self.selected_pos_feats[pos_feats_count:]
+        neg_test_features = self.selected_neg_feats[neg_feats_count:]
 
         self.train_features = pos_train_features + neg_train_features
         self.test_features = pos_test_features + neg_test_features
@@ -326,7 +334,6 @@ class movie_sentiment:
 
     def NaiveBayesClassification(self, train_features, test_features):
         
-
         #Training
         self.nb_classifier = NaiveBayesClassifier.train(train_features)
 
@@ -386,6 +393,9 @@ class movie_sentiment:
 
 
     def find_precision(self, actual_polarity_dict, predicted_polarity_dict):
+      
+        #Finding precision values
+
         pos_precision = self.pos_precision(actual_polarity_dict, predicted_polarity_dict)
         neg_precision = self.neg_precision(actual_polarity_dict, predicted_polarity_dict)   
         return (pos_precision, neg_precision)
@@ -401,6 +411,9 @@ class movie_sentiment:
         return neg_val_precision
 
     def find_recall(self, actual_polarity_dict, predicted_polarity_dict):
+            
+        #Finding recall values
+
         pos_recall = self.pos_recall(actual_polarity_dict, predicted_polarity_dict)
         neg_recall = self.neg_recall(actual_polarity_dict, predicted_polarity_dict)
         return (pos_recall, neg_recall)
@@ -416,6 +429,9 @@ class movie_sentiment:
         return neg_val_recall
 
     def find_fmeasure(self, pos_precision, neg_precision, pos_recall, neg_recall):
+        
+        #Finding f measure
+        
         self.pos_fmeasure(pos_precision, pos_recall)
         self.neg_fmeasure(neg_precision, neg_recall)
 
