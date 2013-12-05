@@ -50,7 +50,7 @@ class movie_sentiment:
         self.neg_reviews_list = []
         self.bow_dict = {}
         #self.words_selection_dict = {"top_100":100, "top_500":500, "top_1000":1000, "top_5000":5000, "top_10000":10000, "top_20000":20000, "bigram":10000, "all_words":10000}
-        self.words_selection_dict = {"top_10000":10000} 
+        self.words_selection_dict = {"bigram":10000} 
         self.stopwords_set = set(stopwords.words('english'))    
         self.stemmer = nltk.stem.PorterStemmer()
         
@@ -183,7 +183,7 @@ class movie_sentiment:
         self.bestwords = list(set([w for w, s in self.best[:self.words_count]]))       
         
         for feat in features_list:
-            if feat  and feat.lower() in self.bestwords:
+            if feat  and feat in self.bestwords:
                 selected_feat_list.append((feat, True))
         return dict(selected_feat_list)
        
@@ -192,7 +192,7 @@ class movie_sentiment:
         selected_feat_list = []
         
         for feat in features_list:
-            if feat and feat.lower():
+            if feat:
                 selected_feat_list.append((feat, True))
         return dict(selected_feat_list)
 
@@ -211,21 +211,23 @@ class movie_sentiment:
         return selected_bigrams
 
     def compute_word_scores(self):
-       
-        self.bestwords = []
+      
+        #Core module which assigns scores to features and features are selected based on this score.
  
         fd_obj = FreqDist()
         cf_obj = ConditionalFreqDist()
 
         for review in self.pos_reviews_list:
-            for word in review.split():
-                fd_obj.inc(word.lower())
-                cf_obj['pos'].inc(word.lower())
+            review_words = self.apply_preprocessing(review)
+            for word in review_words:
+                fd_obj.inc(word)
+                cf_obj['pos'].inc(word)
 
         for review in self.neg_reviews_list:
-            for word in review.split():
-                fd_obj.inc(word.lower())
-                cf_obj['neg'].inc(word.lower())
+            review_words = self.apply_preprocessing(review)
+            for word in review_words:
+                fd_obj.inc(word)
+                cf_obj['neg'].inc(word)
 
         pos_word_count = cf_obj['pos'].N()
         neg_word_count = cf_obj['neg'].N()
@@ -234,6 +236,7 @@ class movie_sentiment:
         word_score_dict = {}
 
         for word, freq in fd_obj.iteritems():
+          
             pos_score = BigramAssocMeasures.chi_sq(cf_obj['pos'][word], (freq, pos_word_count), total_word_count)
             neg_score = BigramAssocMeasures.chi_sq(cf_obj['neg'][word], (freq, neg_word_count), total_word_count)
             word_score_dict[word] = pos_score + neg_score 
@@ -250,12 +253,12 @@ class movie_sentiment:
     def apply_preprocessing(self, review):
 
         cleaned_review = []
-        
+       
         for word in review.split():
             if word and word not in self.stopwords_set:
                 if word.isalnum():
-                    root_word = self.stemmer.stem(word)
-                    cleaned_review.append(root_word)
+                    #root_word = self.stemmer.stem(word)
+                    cleaned_review.append(word.lower())
 
         return cleaned_review 
 
