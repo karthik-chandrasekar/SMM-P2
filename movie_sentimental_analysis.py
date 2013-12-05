@@ -7,6 +7,7 @@ from nltk.probability import FreqDist, ConditionalFreqDist
 from sklearn.metrics import classification_report
 from nltk.metrics import BigramAssocMeasures
 from nltk.collocations import BigramCollocationFinder
+from nltk.corpus import stopwords
 
 class movie_sentiment:
     def __init__(self):
@@ -48,8 +49,11 @@ class movie_sentiment:
         self.pos_reviews_list = []
         self.neg_reviews_list = []
         self.bow_dict = {}
-        #self.words_selection_dict = {"top_100":100, "top_500":500, "top_1000":1000, "top_5000":5000, "top_10000":10000, "top_20000":20000, "bigram":0, "all_words":0}
-        self.words_selection_dict = {"bigram":10000} 
+        #self.words_selection_dict = {"top_100":100, "top_500":500, "top_1000":1000, "top_5000":5000, "top_10000":10000, "top_20000":20000, "bigram":10000, "all_words":10000}
+        self.words_selection_dict = {"top_10000":10000} 
+        self.stopwords_set = set(stopwords.words('english'))    
+        self.stemmer = nltk.stem.PorterStemmer()
+        
 
 
     def initialize_logger(self):
@@ -188,12 +192,12 @@ class movie_sentiment:
         selected_feat_list = []
         
         for feat in features_list:
-            if feat:
+            if feat and feat.lower():
                 selected_feat_list.append((feat, True))
         return dict(selected_feat_list)
 
-    def bigram_feature_selection(self, features_list):
 
+    def bigram_feature_selection(self, features_list):
     
         score = BigramAssocMeasures.chi_sq
         n = 200
@@ -237,18 +241,30 @@ class movie_sentiment:
             self.best = sorted(word_score_dict.iteritems(), key=lambda (w,s): s, reverse=True)
 
 
-
     def feature_extraction(self):
 
         self.pos_feat_extraction()
         self.neg_feat_extraction()
+
+
+    def apply_preprocessing(self, review):
+
+        cleaned_review = []
+        
+        for word in review.split():
+            if word and word not in self.stopwords_set:
+                if word.isalnum():
+                    root_word = self.stemmer.stem(word)
+                    cleaned_review.append(root_word)
+
+        return cleaned_review 
 
     def pos_feat_extraction(self):
         self.selected_pos_feats = []
 
         #Select positive features
         for review in self.pos_reviews_list:
-            review_words = review.split(" ")
+            review_words = self.apply_preprocessing(review)
 
             # Top n best features are selected
             if self.best_feat:
@@ -270,7 +286,8 @@ class movie_sentiment:
 
         #Selecte negative features
         for review in self.neg_reviews_list:
-            review_words = review.split(" ")
+            review_words = self.apply_preprocessing(review)
+
 
             # Top n best features are selected
             if self.best_feat:
@@ -372,12 +389,12 @@ class movie_sentiment:
 
     def pos_precision(self, actual_polarity_dict, predicted_polarity_dict):
         pos_val_precision = nltk.metrics.precision(actual_polarity_dict['pos'], predicted_polarity_dict['pos'])
-        print "Pos values preicsiion %s" % (pos_val_precision)
+        print "Pos values precision %s" % (pos_val_precision)
         return pos_val_precision
 
     def neg_precision(self, actual_polarity_dict, predicted_polarity_dict):
         neg_val_precision = nltk.metrics.precision(actual_polarity_dict['neg'], predicted_polarity_dict['neg'])
-        print "Neg values preicsiion %s" % (neg_val_precision)
+        print "Neg values precision %s" % (neg_val_precision)
         return neg_val_precision
 
     def find_recall(self, actual_polarity_dict, predicted_polarity_dict):
