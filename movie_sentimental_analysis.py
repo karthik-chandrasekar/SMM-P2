@@ -114,7 +114,7 @@ class movie_sentiment:
         for review in self.neg_rev_fd.readlines():
             self.neg_reviews_list.append(review)
 
-        #self.load_dataset_two()
+        self.load_dataset_two()
         #self.load_d2_reviews()
 
 
@@ -252,7 +252,8 @@ class movie_sentiment:
         cleaned_review = []
        
         for word in review.split():
-            cleaned_review.append(word)
+            if word and word not in self.stopwords_set:
+                cleaned_review.append(word.lower())
 
         return cleaned_review 
 
