@@ -79,6 +79,7 @@ class movie_sentiment:
             self.feature_extraction()
             self.classification()
             self.testing()
+            self.cross_validation()
 
     def preprocessing(self):
         self.initialize_logger()
@@ -114,7 +115,7 @@ class movie_sentiment:
         for review in self.neg_rev_fd.readlines():
             self.neg_reviews_list.append(review)
 
-        self.load_dataset_two()
+        #self.load_dataset_two()
         #self.load_d2_reviews()
 
 
@@ -357,7 +358,7 @@ class movie_sentiment:
 
     def testing(self):
 
-        print "Naive Bayes \n"
+        print "Naive Bayes"
 
         #Naive bayes
         actual_pol_dict, predicted_pol_dict = self.load_test_and_predicted_values(self.nb_classifier)
@@ -366,14 +367,51 @@ class movie_sentiment:
         self.find_fmeasure(pos_precision, neg_precision, pos_recall, neg_recall)
 
 
-        print " Support vector machine \n"
+        print " Support vector machine"
 
         #Support Vector Machine
         actual_pol_dict, predicted_pol_dict = self.load_test_and_predicted_values(self.svm_classifier)
         pos_precision, neg_precision = self.find_precision(actual_pol_dict, predicted_pol_dict)
         pos_recall, neg_recall = self.find_recall(actual_pol_dict, predicted_pol_dict)
         self.find_fmeasure(pos_precision, neg_precision, pos_recall, neg_recall)
+       
+
+    def cross_validation(self):
         
+        #10 fold cross validation
+
+        pos_feats_count = len(self.selected_pos_feats)
+        neg_feats_count = len(self.selected_neg_feats)
+ 
+        
+        pos_feats_fold_size = int(pos_feats_count / 10)
+        neg_feats_fold_size = int(neg_feats_count / 10)
+
+        for a in range(10):
+            start_pos_feats_test_index = a * pos_feats_fold_size
+            end_pos_feats_test_index = start_pos_feats_test_index + pos_feats_fold_size
+
+            start_neg_feats_test_index = a * neg_feats_fold_size
+            end_neg_feats_test_index = start_neg_feats_test_index + neg_feats_fold_size
+
+            pos_test_features = self.selected_pos_feats[start_pos_feats_test_index:end_pos_feats_test_index]
+            neg_test_features = self.selected_neg_feats[start_neg_feats_test_index:end_neg_feats_test_index]
+
+            pos_train_features = self.selected_pos_feats[:start_pos_feats_test_index] 
+            pos_train_features += self.selected_pos_feats[end_pos_feats_test_index:]
+            
+            neg_train_features = self.selected_neg_feats[:start_neg_feats_test_index]
+            neg_train_features += self.selected_neg_feats[end_neg_feats_test_index:]
+
+            train_features = pos_train_features + neg_train_features
+            test_features = pos_test_features + neg_test_features
+
+
+            #Naive Bayes classification
+            self.NaiveBayesClassification(train_features, test_features)
+
+            #SVM classification
+            self.SVMClassification(train_features, test_features)
 
     def load_test_and_predicted_values(self, classifier):
         #Find the precision and recall
