@@ -50,7 +50,7 @@ class movie_sentiment:
         self.neg_reviews_list = []
         self.bow_dict = {}
         #self.words_selection_dict = {"top_100":100, "top_500":500, "top_1000":1000, "top_5000":5000, "top_10000":10000, "top_20000":20000, "bigram":10000, "all_words":10000}
-        self.words_selection_dict = {"bigram":10000} 
+        self.words_selection_dict = {"top_10000":10000} 
         self.stopwords_set = set(stopwords.words('english'))    
         self.stemmer = nltk.stem.PorterStemmer()
         
@@ -114,7 +114,7 @@ class movie_sentiment:
         for review in self.neg_rev_fd.readlines():
             self.neg_reviews_list.append(review)
 
-        self.load_dataset_two()
+        #self.load_dataset_two()
         #self.load_d2_reviews()
 
 
@@ -235,9 +235,6 @@ class movie_sentiment:
 
         for word, freq in fd_obj.iteritems():
          
-            if freq < 3:
-                continue
- 
             pos_score = BigramAssocMeasures.chi_sq(cf_obj['pos'][word], (freq, pos_word_count), total_word_count)
             neg_score = BigramAssocMeasures.chi_sq(cf_obj['neg'][word], (freq, neg_word_count), total_word_count)
             word_score_dict[word] = pos_score + neg_score 
@@ -255,10 +252,7 @@ class movie_sentiment:
         cleaned_review = []
        
         for word in review.split():
-            if word :
-                if word.isalpha():
-                    root_word = self.stemmer.stem(word)
-                    cleaned_review.append(root_word.lower())
+            cleaned_review.append(word)
 
         return cleaned_review 
 
@@ -314,6 +308,7 @@ class movie_sentiment:
         pos_feats_count = int(len(self.selected_pos_feats) * 0.75)
         neg_feats_count = int(len(self.selected_neg_feats) * 0.75)
  
+
         print "pos feats count : %s" % (pos_feats_count)
         print "neg feats count : %s" % (neg_feats_count)
 
