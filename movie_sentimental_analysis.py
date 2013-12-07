@@ -1,3 +1,4 @@
+import operator
 import nltk.classify.util
 from nltk.classify import NaiveBayesClassifier
 import nltk, os, logging, json, ConfigParser, codecs
@@ -10,6 +11,7 @@ from nltk.collocations import BigramCollocationFinder
 from nltk.corpus import stopwords
 
 class movie_sentiment:
+
     def __init__(self):
         self.config = ConfigParser.ConfigParser()
         self.config.read("senti_analysis.config")
@@ -61,19 +63,23 @@ class movie_sentiment:
     def run_main(self):
         self.preprocessing()
         
-        # Classifier is trained on all features, specific number of top features sorted by frequency, bigram features 
+        # Classifier is trained on all features, specific number of top features, specified number of bigram features 
 
         for key, words_count in  self.words_selection_dict.iteritems():
 
-            self.all_feat = self.bigram_active = self.best_feat = 0 
+            self.all_feat = self.bigram_active = self.best_feat = 0
+ 
             print "Training classifier on  %s" % (key)
 
-            if key == "all_words":
+            if key == "all_words": #Selects all feats as features
                 self.all_feat = 1
-            elif key == "bigram":
+
+            elif key == "bigram":  #Selects top k bigram feats and top n unigram feats
                 self.bigram_active = 1
+
             else:
-                self.best_feat = 1
+                self.best_feat = 1 #Selects top n unigram feats
+ 
             self.words_count = words_count
 
             self.feature_extraction()
@@ -101,7 +107,6 @@ class movie_sentiment:
 
     def load_bow(self):
         counter = 0
-
         for word in self.bow_fd.readlines():
             self.bow_dict[counter] = word and word.strip()     
             counter += 1 
@@ -120,7 +125,6 @@ class movie_sentiment:
 
 
     def load_d2_reviews(self):
-        
         d2_pos_reviews = []
         d2_neg_reviews = []       
 
@@ -133,14 +137,12 @@ class movie_sentiment:
             for lines in pos_fd.readlines():
                 d2_pos_reviews.append(lines)
 
-
         for neg_file in neg_files:
             neg_filename = os.path.join(self.d2_neg_reviews_file_dir, neg_file)
             neg_fd = open(neg_filename, 'r')
             for lines in neg_fd.readlines():
                 d2_neg_reviews.append(lines)
     
-
         self.pos_reviews_list.extend(d2_pos_reviews[:1000])
         self.neg_reviews_list.extend(d2_neg_reviews[:5000])
 
@@ -148,7 +150,6 @@ class movie_sentiment:
     def load_dataset_two(self):
         d2_pos_reviews_list = []
         d2_neg_reviews_list = []        
-
 
         for review in self.train_file_fd.readlines():
             label = review[0]
@@ -197,7 +198,6 @@ class movie_sentiment:
 
 
     def bigram_feature_selection(self, features_list):
-    
         score = BigramAssocMeasures.chi_sq
         n = 200
         
@@ -209,47 +209,50 @@ class movie_sentiment:
         selected_bigrams.update(selected_monograms) 
         return selected_bigrams
 
-    def compute_word_scores(self):
-      
-        #Core module which assigns scores to features and features are selected based on this score.
- 
-        fd_obj = FreqDist()
-        cf_obj = ConditionalFreqDist()
 
+    def compute_word_scores(self):
+        #Core module which assigns scores to features and top features are selected based on this score.
+        
+        freq_dist_obj = FreqDist()
+        cond_freq_dist_obj = ConditionalFreqDist()
+
+        #Iterating over pos reviews, to calcutate scores for pos feats
         for review in self.pos_reviews_list:
             review_words = self.apply_preprocessing(review)
             for word in review_words:
-                fd_obj.inc(word)
-                cf_obj['pos'].inc(word)
+                freq_dist_obj.inc(word)
+                cond_freq_dist_obj['pos'].inc(word)
 
+        #Iterating over neg reviews, to calculate scores for neg feats
         for review in self.neg_reviews_list:
             review_words = self.apply_preprocessing(review)
             for word in review_words:
-                fd_obj.inc(word)
-                cf_obj['neg'].inc(word)
+                freq_dist_obj.inc(word)
+                cond_freq_dist_obj['neg'].inc(word)
 
-        pos_word_count = cf_obj['pos'].N()
-        neg_word_count = cf_obj['neg'].N()
+        pos_word_count = cond_freq_dist_obj['pos'].N()
+        neg_word_count = cond_freq_dist_obj['neg'].N()
         total_word_count = pos_word_count + neg_word_count
-        
+
         word_score_dict = {}
+    
+        #Finding the scores using chi square
 
-        for word, freq in fd_obj.iteritems():
-         
-            pos_score = BigramAssocMeasures.chi_sq(cf_obj['pos'][word], (freq, pos_word_count), total_word_count)
-            neg_score = BigramAssocMeasures.chi_sq(cf_obj['neg'][word], (freq, neg_word_count), total_word_count)
-            word_score_dict[word] = pos_score + neg_score 
+        for word, freq in freq_dist_obj.iteritems():
+            pos_score = BigramAssocMeasures.chi_sq(cond_freq_dist_obj['pos'][word], (freq, pos_word_count), total_word_count)
+            neg_score = BigramAssocMeasures.chi_sq(cond_freq_dist_obj['neg'][word], (freq, neg_word_count), total_word_count)
+            word_score_dict[word] = pos_score + neg_score
 
-        self.best = sorted(word_score_dict.iteritems(), key=lambda (w,s): s, reverse=True)
+        #self.best = sorted(word_score_dict.iteritems(), key=lambda (w,s): s, reverse=True)
+        
+        self.best =  sorted(word_score_dict.iteritems(), key=operator.itemgetter(1), reverse=True)
 
 
     def feature_extraction(self):
-
         self.pos_feat_extraction()
         self.neg_feat_extraction()
 
     def apply_preprocessing(self, review):
-
         cleaned_review = []
        
         for word in review.split():
@@ -265,15 +268,15 @@ class movie_sentiment:
         for review in self.pos_reviews_list:
             review_words = self.apply_preprocessing(review)
 
-            # Top n best features are selected
+            # Top n best pos features are selected
             if self.best_feat:
                 selected_review_words = self.feature_selection(review_words) 
            
-            # All features are selected
+            # All pos features are selected
             elif self.all_feat:
                 selected_review_words = self.all_feature_selection(review_words)
         
-            # Bigram features are selected along with top n best features
+            # Top k bigram features are selected along with top n best pos features
             elif self.bigram_active:
                 selected_review_words = self.bigram_feature_selection(review_words)
 
@@ -287,16 +290,15 @@ class movie_sentiment:
         for review in self.neg_reviews_list:
             review_words = self.apply_preprocessing(review)
 
-
-            # Top n best features are selected
+            # Top n best neg features are selected
             if self.best_feat:
                 selected_review_words = self.feature_selection(review_words) 
            
-            # All features are selected
+            # All neg features are selected
             elif self.all_feat:
                 selected_review_words = self.all_feature_selection(review_words)
     
-            # Bigram features are selected along with the top n best features
+            # Top k bigram features are selected along with the top n best neg features
             elif self.bigram_active:
                 selected_review_words = self.bigram_feature_selection(review_words)
 
@@ -304,15 +306,10 @@ class movie_sentiment:
 
 
     def classification(self):
-      
-        #Let us used 75 %  of data for training and 25 % for testing
+        #Let us use 75 %  of data for training and 25 % for testing
 
         pos_feats_count = int(len(self.selected_pos_feats) * 0.75)
         neg_feats_count = int(len(self.selected_neg_feats) * 0.75)
- 
-
-        print "pos feats count : %s" % (pos_feats_count)
-        print "neg feats count : %s" % (neg_feats_count)
 
         pos_train_features = self.selected_pos_feats[:pos_feats_count]
         neg_train_features = self.selected_neg_feats[:neg_feats_count]        
@@ -326,19 +323,22 @@ class movie_sentiment:
         #NaiveBayes Classfication
         self.NaiveBayesClassification(self.train_features, self.test_features)
         
-        #Support vecotr machine Classification
+        #Support vecotr machine - Linear support vector classification
         self.SVMClassification(self.train_features, self.test_features)
 
     def NaiveBayesClassification(self, train_features, test_features):
-        
+        # Training and finding accuracy of  NaiveBayes Classifier    
+    
         #Training
         self.nb_classifier = NaiveBayesClassifier.train(train_features)
 
         #Testing
-        print 'accuracy:', nltk.classify.util.accuracy(self.nb_classifier, test_features)
+        print '\n ACCURACY - NAIVE BAYE CLASSIFIER: %s \n' % (nltk.classify.util.accuracy(self.nb_classifier, test_features))
         self.nb_classifier.show_most_informative_features()
 
     def SVMClassification(self, train_features, test_features):
+        # Training and finding accuracy of  SVM Linear SVC classifier  
+        
         test_feat_list = []
         test_feat_labels_list = []        
 
@@ -353,23 +353,19 @@ class movie_sentiment:
 
         svm_test = self.svm_classifier.batch_classify(test_feat_list)
         
-        print "SVM Classification"
         print classification_report(test_feat_labels_list, svm_test, labels=['pos','neg'], target_names=['pos', 'neg'])
 
     def testing(self):
+        #Findng precision, recall and f measures for both classifier 
 
-        print "Naive Bayes"
-
-        #Naive bayes
+        #Naive Bayes classification
         actual_pol_dict, predicted_pol_dict = self.load_test_and_predicted_values(self.nb_classifier)
         pos_precision, neg_precision = self.find_precision(actual_pol_dict, predicted_pol_dict)
         pos_recall, neg_recall = self.find_recall(actual_pol_dict, predicted_pol_dict)
         self.find_fmeasure(pos_precision, neg_precision, pos_recall, neg_recall)
 
 
-        print " Support vector machine"
-
-        #Support Vector Machine
+        #Support Vector Machine - Linear SVC classification
         actual_pol_dict, predicted_pol_dict = self.load_test_and_predicted_values(self.svm_classifier)
         pos_precision, neg_precision = self.find_precision(actual_pol_dict, predicted_pol_dict)
         pos_recall, neg_recall = self.find_recall(actual_pol_dict, predicted_pol_dict)
@@ -377,12 +373,10 @@ class movie_sentiment:
        
 
     def cross_validation(self):
-        
-        #10 fold cross validation
+        #10 fold cross validation for both classifiers
 
         pos_feats_count = len(self.selected_pos_feats)
         neg_feats_count = len(self.selected_neg_feats)
- 
         
         pos_feats_fold_size = int(pos_feats_count / 10)
         neg_feats_fold_size = int(neg_feats_count / 10)
@@ -406,12 +400,13 @@ class movie_sentiment:
             train_features = pos_train_features + neg_train_features
             test_features = pos_test_features + neg_test_features
 
-
             #Naive Bayes classification
             self.NaiveBayesClassification(train_features, test_features)
 
             #SVM classification
             self.SVMClassification(train_features, test_features)
+
+            self.testing()
 
     def load_test_and_predicted_values(self, classifier):
         #Find the precision and recall
@@ -427,7 +422,6 @@ class movie_sentiment:
 
 
     def find_precision(self, actual_polarity_dict, predicted_polarity_dict):
-      
         #Finding precision values
 
         pos_precision = self.pos_precision(actual_polarity_dict, predicted_polarity_dict)
@@ -441,11 +435,10 @@ class movie_sentiment:
 
     def neg_precision(self, actual_polarity_dict, predicted_polarity_dict):
         neg_val_precision = nltk.metrics.precision(actual_polarity_dict['neg'], predicted_polarity_dict['neg'])
-        print "Neg values precision %s" % (neg_val_precision)
+        print "Neg values precision %s\n" % (neg_val_precision)
         return neg_val_precision
 
     def find_recall(self, actual_polarity_dict, predicted_polarity_dict):
-            
         #Finding recall values
 
         pos_recall = self.pos_recall(actual_polarity_dict, predicted_polarity_dict)
@@ -459,13 +452,11 @@ class movie_sentiment:
 
     def neg_recall(self, actual_polarity_dict, predicted_polarity_dict):
         neg_val_recall = nltk.metrics.recall(actual_polarity_dict['neg'], predicted_polarity_dict['neg'])
-        print "Neg values recall %s" % (neg_val_recall) 
+        print "Neg values recall %s\n" % (neg_val_recall) 
         return neg_val_recall
 
     def find_fmeasure(self, pos_precision, neg_precision, pos_recall, neg_recall):
-        
-        #Finding f measure
-        
+         #Finding f measure
         self.pos_fmeasure(pos_precision, pos_recall)
         self.neg_fmeasure(neg_precision, neg_recall)
 
@@ -475,7 +466,7 @@ class movie_sentiment:
  
     def neg_fmeasure(self, neg_precision, neg_recall):
         neg_fmeasure_val = 2 * (neg_precision * neg_recall) / float(neg_precision + neg_recall)          
-        print "F measure for neg val %s" % (neg_fmeasure_val)
+        print "F measure for neg val %s\n" % (neg_fmeasure_val)
 
 if __name__ == "__main__":
     ms = movie_sentiment()
