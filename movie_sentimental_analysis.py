@@ -52,7 +52,7 @@ class movie_sentiment:
         self.neg_reviews_list = []
         self.bow_dict = {}
         #self.words_selection_dict = {"top_100":100, "top_500":500, "top_1000":1000, "top_5000":5000, "top_10000":10000, "top_20000":20000, "bigram":10000, "all_words":10000}
-        self.words_selection_dict = {"top_10000":10000} 
+        self.words_selection_dict = {"top_12500":12500} 
         self.stopwords_set = set(stopwords.words('english'))    
         self.stemmer = nltk.stem.PorterStemmer()
         
@@ -84,7 +84,6 @@ class movie_sentiment:
 
             self.feature_extraction()
             self.classification()
-            self.testing()
             self.cross_validation()
 
     def preprocessing(self):
@@ -199,7 +198,7 @@ class movie_sentiment:
 
     def bigram_feature_selection(self, features_list):
         score = BigramAssocMeasures.chi_sq
-        n = 200
+        n = 250
         
         all_bigrams = BigramCollocationFinder.from_words(features_list)
         best_bigrams = all_bigrams.nbest(score, n)
@@ -257,7 +256,7 @@ class movie_sentiment:
        
         for word in review.split():
             if word and word not in self.stopwords_set:
-                cleaned_review.append(word.lower())
+                cleaned_review.append(word.lower().strip())
 
         return cleaned_review 
 
@@ -326,6 +325,8 @@ class movie_sentiment:
         #Support vecotr machine - Linear support vector classification
         self.SVMClassification(self.train_features, self.test_features)
 
+        self.testing("75-25")
+
     def NaiveBayesClassification(self, train_features, test_features):
         # Training and finding accuracy of  NaiveBayes Classifier    
     
@@ -333,8 +334,8 @@ class movie_sentiment:
         self.nb_classifier = NaiveBayesClassifier.train(train_features)
 
         #Testing
-        print '\n ACCURACY - NAIVE BAYE CLASSIFIER: %s \n' % (nltk.classify.util.accuracy(self.nb_classifier, test_features))
-        self.nb_classifier.show_most_informative_features()
+        #print '\n ACCURACY - NAIVE BAYE CLASSIFIER: %s \n' % (nltk.classify.util.accuracy(self.nb_classifier, test_features))
+        #self.nb_classifier.show_most_informative_features()
 
     def SVMClassification(self, train_features, test_features):
         # Training and finding accuracy of  SVM Linear SVC classifier  
@@ -353,20 +354,22 @@ class movie_sentiment:
 
         svm_test = self.svm_classifier.batch_classify(test_feat_list)
         
-        print classification_report(test_feat_labels_list, svm_test, labels=['pos','neg'], target_names=['pos', 'neg'])
+        #print classification_report(test_feat_labels_list, svm_test, labels=['pos','neg'], target_names=['pos', 'neg'])
 
-    def testing(self):
+    def testing(self, iteration):
         #Findng precision, recall and f measures for both classifier 
 
         #Naive Bayes classification
-        actual_pol_dict, predicted_pol_dict = self.load_test_and_predicted_values(self.nb_classifier)
+        print "NAIVE BAYES - ITERATION %s" % (iteration) 
+        actual_pol_dict, predicted_pol_dict = self.get_actual_and_predicted_polarity_dict(self.nb_classifier)
         pos_precision, neg_precision = self.find_precision(actual_pol_dict, predicted_pol_dict)
         pos_recall, neg_recall = self.find_recall(actual_pol_dict, predicted_pol_dict)
         self.find_fmeasure(pos_precision, neg_precision, pos_recall, neg_recall)
 
-
+    
+        print "SVM - Linear SVC - ITERATION %s" % (iteration)
         #Support Vector Machine - Linear SVC classification
-        actual_pol_dict, predicted_pol_dict = self.load_test_and_predicted_values(self.svm_classifier)
+        actual_pol_dict, predicted_pol_dict = self.get_actual_and_predicted_polarity_dict(self.svm_classifier)
         pos_precision, neg_precision = self.find_precision(actual_pol_dict, predicted_pol_dict)
         pos_recall, neg_recall = self.find_recall(actual_pol_dict, predicted_pol_dict)
         self.find_fmeasure(pos_precision, neg_precision, pos_recall, neg_recall)
@@ -406,9 +409,9 @@ class movie_sentiment:
             #SVM classification
             self.SVMClassification(train_features, test_features)
 
-            self.testing()
+            self.testing(a)
 
-    def load_test_and_predicted_values(self, classifier):
+    def get_actual_and_predicted_polarity_dict(self, classifier):
         #Find the precision and recall
         actual_polarity_dict = {}
         predicted_polarity_dict = {}
@@ -457,16 +460,19 @@ class movie_sentiment:
 
     def find_fmeasure(self, pos_precision, neg_precision, pos_recall, neg_recall):
          #Finding f measure
-        self.pos_fmeasure(pos_precision, pos_recall)
-        self.neg_fmeasure(neg_precision, neg_recall)
+        pos_f_measure = self.pos_fmeasure(pos_precision, pos_recall)
+        neg_f_measure = self.neg_fmeasure(neg_precision, neg_recall)
+        print "Average F-measure %s\n" % ((pos_f_measure + neg_f_measure)/2)
 
     def pos_fmeasure(self, pos_precision, pos_recall):
         pos_fmeasure_val = 2 * (pos_precision * pos_recall) / float(pos_precision + pos_recall)          
-        print "F measure for pos val %s" % (pos_fmeasure_val)           
- 
+        print "F-measure for pos val %s" % (pos_fmeasure_val)           
+        return pos_fmeasure_val 
+
     def neg_fmeasure(self, neg_precision, neg_recall):
         neg_fmeasure_val = 2 * (neg_precision * neg_recall) / float(neg_precision + neg_recall)          
-        print "F measure for neg val %s\n" % (neg_fmeasure_val)
+        print "F-measure for neg val %s" % (neg_fmeasure_val)
+        return neg_fmeasure_val
 
 if __name__ == "__main__":
     ms = movie_sentiment()
